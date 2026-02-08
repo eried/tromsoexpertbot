@@ -1,0 +1,28 @@
+# Environment variables (contains secrets)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# Runtime data
+data/subscribers.json
+data/alert_state.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+/data/archive
+/data/calibration_images
+
+# Claude Code
+.claude/
