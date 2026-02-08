@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+
+  <title>Tromsø Aurora Expert</title>
+  <meta name="description" content="Factual aurora alerts from public cameras around Tromsø. Continuous monitoring with configurable alert sensitivity inside the bot." />
+
+  <meta property="og:title" content="Tromsø Aurora Expert" />
+  <meta property="og:description" content="Factual aurora alerts from public cameras around Tromsø. Continuous monitoring with configurable alert sensitivity inside the bot." />
+  <meta property="og:image" content="banner.jpg" />
+
+  <link rel="preload" as="image" href="banner.jpg" />
+  <link rel="preload" as="image" href="screenshot-1.jpg" />
+  <link rel="preload" as="image" href="screenshot-2.jpg" />
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="aurora" aria-hidden="true">
+    <div class="aurora__layer aurora__layer--one"></div>
+    <div class="aurora__layer aurora__layer--two"></div>
+    <div class="aurora__vignette"></div>
+    <div class="aurora__grain"></div>
+  </div>
+
+  <main class="page">
+    <section class="card" aria-label="Tromsø Aurora Expert">
+      <div class="card__left">
+        <img class="avatar" src="banner.jpg" alt="Tromsø Aurora Expert bot" />
+
+        <div class="copy">
+          <h1 class="title">Tromsø Aurora Expert</h1>
+          <p class="handle">@tromsoexpertbot</p>
+          <p class="subtitle">Factual aurora alerts from public cameras around Tromsø.</p>
+          <p class="note">Continuously monitors for aurora-like colors using HSV thresholds, blob filtering, and noise baselines. Alert sensitivity is configurable inside the bot. Detection is refined over time using real world samples and calibration.</p>
+        </div>
+
+        <div class="actions" role="group" aria-label="Primary actions">
+          <a class="btn btn--primary" href="https://t.me/tromsoexpertbot" target="_blank" rel="noopener noreferrer">
+            Open in Telegram
+          </a>
+          <a class="btn btn--secondary" href="https://github.com/eried/tromsoexpertbot" target="_blank" rel="noopener noreferrer">
+            GitHub repository
+          </a>
+        </div>
+      </div>
+
+      <div class="card__right" aria-label="Example reports">
+        <button class="peek" type="button" data-shot="0" aria-label="Open screenshot 1">
+          <span class="thumbFrame" aria-hidden="true">
+            <img class="thumbFrame__img" src="screenshot-1.jpg" alt="" loading="lazy" />
+          </span>
+        </button>
+
+        <button class="peek" type="button" data-shot="1" aria-label="Open screenshot 2">
+          <span class="thumbFrame" aria-hidden="true">
+            <img class="thumbFrame__img" src="screenshot-2.jpg" alt="" loading="lazy" />
+          </span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <div id="viewer" class="viewer" hidden>
+    <div class="viewer__backdrop" data-action="close" aria-hidden="true"></div>
+    <div class="viewer__ui" role="dialog" aria-modal="true" aria-label="Screenshot demo">
+      <button class="viewer__close" type="button" data-action="close" aria-label="Close">Close</button>
+      <button class="viewer__nav viewer__nav--prev" type="button" data-action="prev" aria-label="Previous screenshot"></button>
+      <div class="viewer__phone" aria-label="Phone preview">
+        <img id="viewerImg" class="viewer__img" alt="" />
+      </div>
+      <button class="viewer__nav viewer__nav--next" type="button" data-action="next" aria-label="Next screenshot"></button>
+    </div>
+  </div>
+
+  <button id="soundToggle" class="sound" type="button" aria-pressed="false" aria-label="Sound off" hidden>
+    <svg class="sound__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path class="sound__speaker" d="M4 10v4c0 .55.45 1 1 1h3l4 4c.63.63 1.72.18 1.72-.71V5.71c0-.89-1.09-1.34-1.72-.71l-4 4H5c-.55 0-1 .45-1 1z" />
+      <path class="sound__slash" d="M19.5 4.5L4.5 19.5" />
+    </svg>
+  </button>
+
+  <!-- Optional: place a quiet looping track at docs/background.mp3 -->
+  <audio id="bgAudio" preload="auto" loop playsinline src="background.mp3"></audio>
+
+  <script src="script.js" defer></script>
+</body>
+</html>
