@@ -433,13 +433,23 @@ body {
 
 @media (max-width: 420px) {
   .card__right {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .thumbFrame {
+    width: 84px;
   }
 }
 
 @media (max-width: 520px) {
   .actions {
     grid-template-columns: 1fr;
+  }
+
+  .viewer__phone {
+    width: min(320px, 86vw);
+    max-height: 82vh;
   }
 
   .viewer__ui {
@@ -451,6 +461,12 @@ body {
   .viewer__nav {
     width: 44px;
     height: 44px;
+  }
+}
+
+@media (max-width: 360px) {
+  .thumbFrame {
+    width: 76px;
   }
 }
 
