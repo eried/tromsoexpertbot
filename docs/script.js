@@ -82,6 +82,26 @@
 
   let index = 0;
   let lastFocus = null;
+  let hideTimer = null;
+
+  const setQuiet = (quiet) => {
+    // Don't hide if user is hovering a control (desktop convenience)
+    if (quiet && viewer.querySelector('.viewer__close:hover, .viewer__nav:hover')) {
+      scheduleHide(); // Check again later
+      return;
+    }
+    viewer.classList.toggle('viewer--quiet', quiet);
+  };
+
+  const scheduleHide = () => {
+    if (hideTimer) window.clearTimeout(hideTimer);
+    hideTimer = window.setTimeout(() => setQuiet(true), 2000);
+  };
+
+  const showControls = () => {
+    setQuiet(false);
+    scheduleHide();
+  };
 
   const setIndex = (nextIndex) => {
     index = (nextIndex + shots.length) % shots.length;
@@ -94,6 +114,8 @@
     viewer.hidden = false;
     setIndex(startIndex);
 
+    showControls();
+
     // Focus close button for keyboard users.
     const closeBtn = viewer.querySelector('[data-action="close"]');
     if (closeBtn instanceof HTMLButtonElement) closeBtn.focus();
@@ -103,6 +125,9 @@
     viewer.hidden = true;
     viewerImg.removeAttribute('src');
     viewerImg.alt = '';
+    setQuiet(false);
+    if (hideTimer) window.clearTimeout(hideTimer);
+    hideTimer = null;
     if (lastFocus instanceof HTMLElement) lastFocus.focus();
     lastFocus = null;
   };
@@ -128,10 +153,26 @@
     if (action === 'close') close();
     if (action === 'prev') prev();
     if (action === 'next') next();
+
+    // If user taps/clicks inside the viewer (even not on controls), bring controls back.
+    if (!action) showControls();
   });
+
+  // Re-show controls on activity, then auto-hide.
+  viewer.addEventListener('pointermove', () => {
+    if (viewer.hidden) return;
+    showControls();
+  });
+
+  viewer.addEventListener('touchstart', () => {
+    if (viewer.hidden) return;
+    showControls();
+  }, { passive: true });
 
   document.addEventListener('keydown', (e) => {
     if (viewer.hidden) return;
+
+    showControls();
 
     if (e.key === 'Escape') {
       e.preventDefault();
