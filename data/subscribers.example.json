@@ -1,0 +1,9 @@
+{
+  "subscribers": [
+    {
+      "chat_id": 123456789,
+      "subscribed_at": "2026-01-15T10:00:00+00:00",
+      "alert_level": 2
+    }
+  ]
+}

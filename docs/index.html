@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Tromsø Aurora Expert</title>
+<meta name="description" content="Is there aurora over Tromsø right now? Live answer from seven public cameras, with alerts on Telegram.">
+<meta property="og:title" content="Tromsø Aurora Expert">
+<meta property="og:description" content="Is there aurora over Tromsø right now? Live answer from seven public cameras, with alerts on Telegram.">
+<meta property="og:image" content="banner.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter+Tight:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --fg: #e8eef2; --muted: #8796a3; --aurora: #4dffa6;
+  --display: "Fraunces", Georgia, serif;
+  --body: "Inter Tight", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: #02050a; color: var(--fg); font: 15px/1.5 var(--body); overflow: hidden; }
+.stage { position: fixed; inset: 0; isolation: isolate; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+#sky { z-index: 0; } #land, #glow { z-index: 1; } #wx { z-index: 2; } #lens { z-index: 4; }
+.layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; display: grid; align-content: start; justify-items: start; gap: 12px;
+  padding: max(28px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) 0 max(24px, env(safe-area-inset-left));
+  padding-left: max(clamp(24px, 6vw, 88px), env(safe-area-inset-left)); padding-top: max(clamp(28px, 8vh, 96px), env(safe-area-inset-top)); }
+.layer > * { pointer-events: auto; }
+.eyebrow { font: 500 .78rem var(--mono); letter-spacing: .14em; text-transform: uppercase; color: rgb(232 238 242 / .6); }
+.q { font: 400 clamp(1.3rem, 2.8vw, 2rem)/1.15 var(--display); margin: 0; color: rgb(232 238 242 / .82); }
+.answer-wrap { position: relative; }
+.a { min-height: .95em; min-width: 1em; }
+.answer-wrap .a { transition: color .8s, text-shadow .8s, opacity 1s ease .2s, filter 1.1s ease .2s, transform 1.1s cubic-bezier(.2,.7,.2,1) .2s; }
+.answer-wrap .a.loading { opacity: 0; filter: blur(14px); transform: scaleX(1.08); transform-origin: left center; }
+/* loading: three dots breathe in turn where the answer will appear, then fade as it sharpens in */
+.dots { position: absolute; left: 0; top: 0; display: flex; font: 600 clamp(3.6rem, 10vw, 8.5rem)/0.95 var(--display); color: var(--fg); pointer-events: none; transition: opacity .5s, filter .5s; }
+.dots span { opacity: .15; animation: breathe 1.6s ease-in-out infinite; }
+.dots span:nth-child(2) { animation-delay: .2s; } .dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes breathe { 0%, 100% { opacity: .15; } 40% { opacity: .9; } }
+.dots.gone { opacity: 0; filter: blur(8px); }
+body.day .dots { color: #16202a; }
+@media (prefers-reduced-motion: reduce) { .dots span { animation: none; opacity: .5; } }
+.a { font: 600 clamp(3.6rem, 10vw, 8.5rem)/0.95 var(--display); margin: 0; padding: 0; letter-spacing: -.02em; background: none; border: 0; color: var(--fg); cursor: help; text-align: left; transition: color .8s, text-shadow .8s; }
+.a.yes { color: var(--aurora); text-shadow: 0 0 46px rgb(77 255 166 / .35); }
+.tip { position: relative; margin-top: 4px; width: min(340px, 80vw); padding: 14px 16px; border-radius: 14px; background: rgb(8 13 20 / .82); border: 1px solid rgb(255 255 255 / .1); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 18px 50px rgb(0 0 0 / .5); display: grid; gap: 8px; font-size: .9rem; color: var(--fg); opacity: 0; transform: translateY(-4px); pointer-events: none; transition: opacity .2s, transform .2s; z-index: 5; }
+.tip.open { opacity: 1; transform: none; pointer-events: auto; }
+.tip p { margin: 0; color: #d3dde3; }
+.tip dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
+.tip dt { font: 500 .72rem var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
+.tip dd { margin: 0; }
+.cta { display: inline-flex; align-items: center; padding: 10px 18px; border-radius: 12px; font: 600 .95rem var(--body); text-decoration: none; background: rgb(255 255 255 / .1); color: var(--fg); border: 1px solid rgb(255 255 255 / .16); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); margin-top: 6px; }
+.cta { position: relative; overflow: hidden; transition: transform .25s ease, box-shadow .35s ease, background-color .35s ease, border-color .35s ease; }
+.cta::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgb(77 255 166 / .35) 48%, rgb(176 124 255 / .25) 56%, transparent 72%); transform: translateX(-120%); pointer-events: none; }
+.cta:hover { background: rgb(255 255 255 / .16); transform: translateY(-2px); border-color: rgb(77 255 166 / .55); box-shadow: 0 8px 30px rgb(77 255 166 / .22), 0 0 0 1px rgb(77 255 166 / .25); }
+.cta:hover::after { transform: translateX(120%); transition: transform .9s ease; }
+@media (prefers-reduced-motion: reduce) { .cta, .cta:hover { transform: none; } .cta::after { display: none; } }
+.foot { position: absolute; z-index: 3; left: max(clamp(24px, 6vw, 88px), env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); display: flex; gap: 16px; align-items: center; font: 400 .74rem var(--mono); color: rgb(232 238 242 / .28); }
+.foot a { color: inherit; text-decoration: none; }
+.foot a:hover { color: rgb(232 238 242 / .6); }
+.foot .spacer { flex: 1; }
+.rail { position: absolute; z-index: 3; right: max(2px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%) rotate(180deg); writing-mode: vertical-rl; display: flex; align-items: center; gap: 12px; padding: 12px 6px; font: 400 .62rem var(--mono); letter-spacing: .08em; color: rgb(232 238 242 / .13); transition: color .6s; }
+.rail a { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.rail svg { transform: rotate(180deg); }
+.rail:hover, .rail:focus-within, .rail.lit { color: rgb(232 238 242 / .6); }
+body.day .rail { color: rgb(22 32 42 / .2); }
+body.day .rail:hover, body.day .rail:focus-within, body.day .rail.lit { color: rgb(22 32 42 / .75); }
+.sound { background: none; border: 0; padding: 4px; color: rgb(232 238 242 / .35); cursor: pointer; display: inline-flex; }
+.sound:hover { color: rgb(232 238 242 / .7); }
+.sound svg { width: 18px; height: 18px; }
+.sound[aria-pressed="false"] .wave { display: none; }
+.sound[aria-pressed="true"] .slash { display: none; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--aurora); outline-offset: 3px; }
+/* secret: tap the Arctic Cathedral 10 times to open the debug panel */
+#cathedral { position: absolute; z-index: 3; background: none; border: 0; padding: 0; cursor: default; -webkit-tap-highlight-color: transparent; }
+#cathedral:focus { outline: none; }
+.debug { position: absolute; z-index: 6; left: max(16px, env(safe-area-inset-left)); bottom: max(44px, calc(env(safe-area-inset-bottom) + 34px)); width: min(360px, calc(100vw - 32px)); padding: 12px 14px 14px; border-radius: 14px; background: rgb(8 13 20 / .86); border: 1px solid rgb(77 255 166 / .3); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 18px 50px rgb(0 0 0 / .5); color: var(--fg); display: grid; gap: 10px; font-size: .85rem; }
+.debug[hidden] { display: none; }
+.debug header { display: flex; align-items: center; justify-content: space-between; font: 500 .72rem var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--aurora); }
+.debug header button { background: none; border: 0; color: var(--muted); font-size: 1.1rem; cursor: pointer; padding: 0 4px; }
+.debug .row { display: grid; gap: 4px; }
+.debug .row > span { font: 500 .66rem var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.debug .opts { display: flex; flex-wrap: wrap; gap: 4px; }
+.debug .opts button { font: 500 .8rem var(--body); color: var(--fg); background: rgb(255 255 255 / .06); border: 1px solid rgb(255 255 255 / .1); border-radius: 7px; padding: 5px 9px; cursor: pointer; }
+.debug .opts button[aria-pressed="true"] { background: var(--fg); color: #071018; border-color: var(--fg); }
+.debug .opts button:disabled { opacity: .35; cursor: default; }
+/* daylight skies are pale, so the text switches to dark ink */
+body.day .eyebrow { color: rgb(22 32 42 / .62); }
+body.day .q { color: rgb(22 32 42 / .85); }
+body.day .a { color: #16202a; }
+body.day .cta { background: rgb(22 32 42 / .1); color: #16202a; border-color: rgb(22 32 42 / .22); }
+body.day .cta:hover { background: rgb(22 32 42 / .16); border-color: rgb(20 140 90 / .6); box-shadow: 0 8px 26px rgb(20 140 90 / .2); }
+body.day .foot, body.day .sound { color: rgb(22 32 42 / .45); }
+body.day .foot a:hover, body.day .sound:hover { color: rgb(22 32 42 / .8); }
+.eyebrow, .q, .a, .cta, .foot, .sound { transition: color 1.2s, background-color 1.2s, border-color 1.2s; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <canvas id="land" aria-hidden="true"></canvas>
+  <canvas id="glow" aria-hidden="true"></canvas>
+  <canvas id="wx" aria-hidden="true"></canvas>
+  <canvas id="lens" aria-hidden="true"></canvas>
+  <button type="button" id="cathedral" aria-label="Arctic Cathedral" tabindex="-1"></button>
+  <section class="debug" id="debug" hidden aria-label="Debug panel">
+    <header>Debug · overrides live data<button type="button" id="debugClose" aria-label="Close debug panel">×</button></header>
+    <div class="row"><span>Sky</span><div class="opts" id="dbgState">
+      <button type="button" data-v="live">Live</button><button type="button" data-v="day">Daylight</button><button type="button" data-v="quiet">Dark, quiet</button><button type="button" data-v="aurora">Aurora</button></div></div>
+    <div class="row"><span>Intensity</span><div class="opts" id="dbgInt">
+      <button type="button" data-v="1">Faint</button><button type="button" data-v="2">Moderate</button><button type="button" data-v="3">Strong</button><button type="button" data-v="4">Very strong</button></div></div>
+    <div class="row"><span>Weather</span><div class="opts" id="dbgSky">
+      <button type="button" data-v="0">Clear</button><button type="button" data-v="1">Partly cloudy</button><button type="button" data-v="2">Overcast</button><button type="button" data-v="3">Rain</button><button type="button" data-v="4">Snow</button><button type="button" data-v="5">Storm</button></div></div>
+  </section>
+  <main class="layer">
+    <div class="eyebrow">Tromsø · 69.65° N</div>
+    <h1 class="q">Is there aurora?</h1>
+    <div class="answer-wrap">
+      <button type="button" class="a loading" id="answer" aria-describedby="tip" aria-label="Checking"></button>
+      <span class="dots" id="dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
+    </div>
+    <a class="cta" href="https://t.me/tromsoexpertbot" target="_blank" rel="noopener noreferrer">Get alerts</a>
+    <div class="tip" id="tip" role="tooltip">
+      <p id="tipLead">Checking the cameras.</p>
+      <dl>
+        <dt>Signs</dt><dd id="tipCams">–</dd>
+        <dt>Intensity</dt><dd id="tipInt">–</dd>
+        <dt>Weather</dt><dd id="tipWx">–</dd>
+      </dl>
+    </div>
+  </main>
+  <nav class="rail" id="rail" aria-label="About this page">
+    <a href="https://github.com/eried/tromsoexpertbot" target="_blank" rel="noopener noreferrer" title="View / contribute on GitHub"><svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span>github</span></a>
+    <a id="page-version" href="https://github.com/eried/tromsoexpertbot/commits/main/docs/index.html" target="_blank" rel="noopener noreferrer" title="Build date. Opens the history of this page on GitHub."></a>
+  </nav>
+  <div class="foot">
+    <span id="checked">checking…</span>
+    <span class="spacer"></span>
+    <button type="button" class="sound" id="sound" aria-pressed="false" aria-label="Sound" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 10v4h3l5 4V6L7 10H4z" fill="currentColor" stroke="none"/><path class="wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="slash" d="M16 9l5 6M21 9l-5 6"/></svg>
+    </button>
+  </div>
+</div>
+<audio id="music" src="background.mp3" loop preload="none" playsinline></audio>
+
+<script>
+const STATUS_URL = "https://check.ried.no/";
+const WEATHER_URL = "https://check.ried.no/weather.json";
+const POLL_MS = 60 * 1000;
+const WATER = 0.2, WL = 1 - WATER;
+
+// Intensity levels, one notch calmer than the photos look: faint is a soft green patch low in the north-east
+const LEVELS = {
+  1: { name: "Faint", energy: .26, spot: 1, w: [1, 0, 0, 0], lead: "A hint of green low in the north-east. Find a dark spot and give it time." },
+  2: { name: "Moderate", energy: .5, spot: 0, w: [1, 0, 0, 0], lead: "A calm arc across the north. Look north-east, above the mountains." },
+  3: { name: "Strong", energy: .72, spot: 0, w: [0, 1, 0, 0], lead: "Clear curtains, visible from town. Go outside." },
+  4: { name: "Very strong", energy: .9, spot: 0, w: [0, .45, .55, 0], lead: "Bright curtains and a corona forming overhead. Go out now." },
+};
+// sky codes from status.txt: 0 clear, 1 partly cloudy, 2 overcast, 3 rain, 4 snow, 5 storm
+const SKY = [
+  { label: "Clear", cloud: 0, lit: 0, kind: "", wind: 3 },
+  { label: "Partly cloudy", cloud: .45, lit: .25, kind: "", wind: 6 },
+  { label: "Overcast", cloud: .96, lit: .45, kind: "", wind: 8 },
+  { label: "Rain", cloud: .95, lit: .35, kind: "rain", wind: 9 },
+  { label: "Snow", cloud: .9, lit: 1, kind: "snow", wind: 5 },
+  { label: "Storm", cloud: .98, lit: .3, kind: "rain", wind: 24 },
+];
+
+// ---------- Tromsø panorama (x across, y from the top; the water line is at y = 0.8) ----------
+const L = {
+  ridges: [
+    { d: 0, snow: .3, pts: [[-.02, .74], [.1, .705], [.2, .69], [.3, .71], [.38, .755], [.45, .8]] },
+    { d: 0, snow: .5, pts: [[.33, .8], [.42, .68], [.48, .6], [.52, .555], [.56, .59], [.62, .66], [.7, .73], [.76, .78]] },
+    { d: 1, snow: .2, pts: [[.66, .8], [.71, .73], [.75, .64], [.79, .6], [.86, .585], [.95, .58], [1.02, .585]] },
+    { d: 2, pts: [[.4, .8], [.5, .78], [.6, .775], [.68, .785], [.74, .8]] },
+  ],
+  island: [[-.02, .78], [.12, .772], [.25, .772], [.33, .785], [.36, .8]],
+  bridge: { x0: .35, x1: .6, rise: .04 }, cath: { x: .63, h: .06 },
+  houses: [{ x0: .01, x1: .34, on: "island", n: 200 }, { x0: .44, x1: .64, on: 3, n: 45 }, { x0: .7, x1: .98, on: 2, n: 35, below: .05 }],
+};
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function smoothPath(ctx, pts) {
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, y0] = pts[Math.max(0, i - 1)], [x1, y1] = pts[i], [x2, y2] = pts[i + 1], [x3, y3] = pts[Math.min(pts.length - 1, i + 2)];
+    ctx.bezierCurveTo(x1 + (x2 - x0) / 6, y1 + (y2 - y0) / 6, x2 - (x3 - x1) / 6, y2 - (y3 - y1) / 6, x2, y2);
+  }
+}
+function lineY(line, x) {
+  for (let i = 0; i < line.length - 1; i++) if (x >= line[i][0] && x <= line[i + 1][0]) {
+    const t = (x - line[i][0]) / (line[i + 1][0] - line[i][0]); return line[i][1] + (line[i + 1][1] - line[i][1]) * t;
+  }
+  return line[line.length - 1][1];
+}
+const town = (() => {
+  const r = rng(1972), houses = [], lights = [];
+  const DAY = ["#8b9097", "#767c84", "#a2a7ad", "#d8d5ce", "#cfcac0", "#7a2f2b", "#8e3b33", "#6b2a26"];
+  for (const z of L.houses) {
+    const line = z.on === "island" ? L.island : L.ridges[z.on].pts;
+    for (let i = 0; i < z.n; i++) {
+      const x = z.x0 + r() * (z.x1 - z.x0);
+      const top = Math.max(lineY(line, x), z.below ? WL - z.below : 0) + .006;
+      const y = top + (WL - .003 - top) * Math.pow(r(), 1.4);
+      const w = .006 + r() * .008, h = .005 + r() * .006;
+      houses.push({ x, y, w, h, roof: h * (.5 + r() * .4), color: DAY[Math.floor(r() * DAY.length)] });
+      const nWin = r() < .75 ? 1 + Math.floor(r() * 2) : 0;
+      for (let k = 0; k < nWin; k++) lights.push({ x: x + (r() - .5) * w * .6, y: y - h * (.3 + r() * .4), size: .5 + r() * .5, warm: r() > .15, ph: r() * 6.28, f: .6 + r() * 2.2, base: .55 + r() * .45 });
+    }
+    for (let i = 0; i < z.n / 3; i++) lights.push({ x: z.x0 + r() * (z.x1 - z.x0), y: WL - r() * .004, size: .6 + r() * .6, warm: true, ph: r() * 6.28, f: .4 + r() * 1.2, base: .7 + r() * .3, street: true });
+  }
+  for (let i = 1; i < 12; i++) lights.push({ bridgeT: i / 12, size: .7, warm: true, ph: i, f: .3, base: .9 });
+  houses.sort((a, b) => a.y - b.y);
+  lights.forEach((l, i) => { l.blink = !l.street && l.bridgeT === undefined && i % 97 === 13; });
+  return { houses, lights };
+})();
+let cathPath = null;
+const DEPTH = { night: ["rgba(20,32,44,0.92)", "rgba(11,19,28,0.95)", "rgba(5,9,14,0.97)"], day: ["rgba(122,140,160,0.88)", "rgba(90,106,124,0.92)", "rgba(66,78,92,0.95)"] };
+// On narrow (portrait) screens the landscape keeps its proportions and the sides are cropped, like a photo
+const landWidth = (W, H) => Math.max(W, Math.round(H * 1.6));
+// keep the peak and the cathedral in view when cropping
+const landOffset = (W0, W) => Math.min(0, Math.max(W0 - W, W0 / 2 - W * .57));
+function drawLand(target, W0, H, night) {
+  const W = landWidth(W0, H), OX = landOffset(W0, W);
+  const wl = H * WL;
+  const off = document.createElement("canvas"); off.width = W; off.height = H;
+  const ctx = off.getContext("2d");
+  const shape = (pts, x0, x1) => { ctx.beginPath(); smoothPath(ctx, pts.map(([x, y]) => [x * W, y * H])); ctx.lineTo(W * x1, wl); ctx.lineTo(W * x0, wl); ctx.closePath(); };
+  for (const rd of [...L.ridges].sort((a, b) => a.d - b.d)) {
+    const xs = rd.pts.map(p => p[0]), x0 = Math.min(...xs), x1 = Math.max(...xs);
+    shape(rd.pts, x0, x1); ctx.fillStyle = (night ? DEPTH.night : DEPTH.day)[rd.d]; ctx.fill();
+    if (rd.snow) {
+      const peak = Math.min(...rd.pts.map(p => p[1])) * H, snowLine = peak + (wl - peak) * rd.snow;
+      ctx.save(); shape(rd.pts, x0, x1); ctx.clip();
+      const g = ctx.createLinearGradient(0, peak, 0, snowLine), c = night ? "175,190,210" : "244,247,250", a = night ? .16 : .85;
+      g.addColorStop(0, `rgba(${c},${a})`); g.addColorStop(.75, `rgba(${c},${a * .55})`); g.addColorStop(1, `rgba(${c},0)`);
+      ctx.fillStyle = g; ctx.fillRect(0, peak, W, snowLine - peak); ctx.restore();
+    }
+  }
+  shape(L.island, 0, Math.max(...L.island.map(p => p[0]))); ctx.fillStyle = night ? "rgba(5,9,14,0.97)" : "rgba(66,78,92,0.94)"; ctx.fill();
+  for (const hs of town.houses) {
+    const x = hs.x * W, y = hs.y * H, w = hs.w * W, h = hs.h * H, roof = hs.roof * H;
+    ctx.fillStyle = night ? "rgba(3,6,10,0.9)" : hs.color; ctx.fillRect(x - w / 2, y - h, w, h);
+    ctx.fillStyle = night ? "rgba(3,6,10,0.9)" : "rgba(40,44,50,0.85)";
+    ctx.beginPath(); ctx.moveTo(x - w * .56, y - h); ctx.lineTo(x, y - h - roof); ctx.lineTo(x + w * .56, y - h); ctx.closePath(); ctx.fill();
+  }
+  // Arctic Cathedral: plain white silhouette with the stepped roofline
+  const cx = L.cath.x * W, base = wl - H * .004, ch = L.cath.h * H;
+  // remember the outline (in screen pixels) so lights behind the cathedral can be hidden
+  cathPath = new Path2D();
+  cathPath.moveTo(cx - .62 * ch + OX, base); cathPath.lineTo(cx + OX, base - ch);
+  for (const [dx, dy] of [[.13, .8], [.2, .8], [.33, .6], [.4, .6], [.53, .4], [.6, .4]]) cathPath.lineTo(cx + dx * ch + OX, base - dy * ch);
+  cathPath.lineTo(cx + .86 * ch + OX, base); cathPath.closePath();
+  ctx.save(); ctx.translate(-OX, 0);
+  ctx.fillStyle = night ? "rgb(64,73,84)" : "rgb(246,247,249)"; // opaque
+  ctx.fill(cathPath); ctx.restore();
+  // Tromsø bridge: cantilever arch with thin vertical cables
+  const B = L.bridge, y0 = wl - H * .006, peak = wl - H * B.rise, at = (t) => (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * (peak - H * .02) + t * t * y0;
+  ctx.strokeStyle = night ? "rgba(150,170,190,0.30)" : "rgba(40,50,62,0.6)"; ctx.lineWidth = Math.max(1, H * .003);
+  ctx.beginPath(); ctx.moveTo(B.x0 * W, y0); ctx.quadraticCurveTo((B.x0 + B.x1) / 2 * W, peak - H * .02, B.x1 * W, y0); ctx.stroke();
+  ctx.lineWidth = Math.max(.5, H / 900); ctx.strokeStyle = night ? "rgba(150,170,190,0.16)" : "rgba(40,50,62,0.35)";
+  for (let i = 1; i < 22; i++) { const t = i / 22, x = (B.x0 + (B.x1 - B.x0) * t) * W; ctx.beginPath(); ctx.moveTo(x, at(t)); ctx.lineTo(x, y0 + H * .004); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(B.x0 * W, y0 + H * .004); ctx.lineTo(B.x1 * W, y0 + H * .004); ctx.stroke();
+  for (const l of town.lights) if (l.bridgeT !== undefined) { l.x = B.x0 + (B.x1 - B.x0) * l.bridgeT; l.y = at(l.bridgeT) / H; }
+  target.clearRect(0, 0, W0, H);
+  target.drawImage(off, OX, 0);
+  // reflection: the land flipped at the water line, darkened and fading with depth
+  const refl = document.createElement("canvas"); refl.width = W; refl.height = Math.max(1, H - wl);
+  const rc = refl.getContext("2d");
+  rc.save(); rc.translate(0, wl); rc.scale(1, -1); rc.drawImage(off, 0, 0); rc.restore();
+  rc.globalCompositeOperation = "destination-in";
+  const fade = rc.createLinearGradient(0, 0, 0, H - wl);
+  fade.addColorStop(0, "rgba(0,0,0,0.55)"); fade.addColorStop(.6, "rgba(0,0,0,0.12)"); fade.addColorStop(1, "rgba(0,0,0,0)");
+  rc.fillStyle = fade; rc.fillRect(0, 0, W, H - wl);
+  target.drawImage(refl, OX, wl);
+}
+function drawLights(ctx, W0, H, amount, time) {
+  ctx.clearRect(0, 0, W0, H);
+  if (amount < .02) return;
+  const W = landWidth(W0, H), OX = landOffset(W0, W);
+  const wl = H * WL, s = Math.max(.6, H / 700);
+  for (const l of town.lights) {
+    if (l.x === undefined) continue;
+    if (cathPath && ctx.isPointInPath(cathPath, l.x * W + OX, l.y * H)) continue; // behind the cathedral
+    let tw = time === null ? 1 : .95 + .05 * Math.sin(time * l.f * .15 + l.ph); // super subtle breathing
+    if (l.blink && time !== null) { // someone switches the light off for a few seconds, now and then
+      const c = Math.sin(time * .07 + l.ph * 5); tw *= 1 - .9 * Math.min(1, Math.max(0, (c - .82) / .06));
+    }
+    const a = l.base * tw * amount, x = l.x * W + OX, y = l.y * H, size = l.size * s, c = l.warm ? "255,206,140" : "220,235,255";
+    const g = ctx.createRadialGradient(x, y, 0, x, y, size * 3);
+    g.addColorStop(0, `rgba(${c},${Math.min(1, a)})`); g.addColorStop(.35, `rgba(${c},${.3 * a})`); g.addColorStop(1, `rgba(${c},0)`);
+    ctx.fillStyle = g; ctx.fillRect(x - size * 3, y - size * 3, size * 6, size * 6);
+    if (l.street) { const len = H * .02 * l.base, rg = ctx.createLinearGradient(0, wl, 0, wl + len);
+      rg.addColorStop(0, `rgba(${c},${.1 * a})`); rg.addColorStop(1, `rgba(${c},0)`); ctx.fillStyle = rg; ctx.fillRect(x - size * .5, wl + 2, size, len); }
+  }
+}
+
+// ---------- sky shader ----------
+const sky = document.getElementById("sky");
+const gl = sky.getContext("webgl", { antialias: false });
+const VS = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
+const FS = `precision highp float;
+uniform vec2 res; uniform float t, energy, dark, water, cloud, wind, flash, lit, spot;
+uniform vec4 w;
+// sine-free hash (Dave Hoskins): sin()-based hashes lose precision on some GPUs and show blocky cells
+float hash(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.-2.*f);
+  return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);}
+const mat2 ROT=mat2(.8,.6,-.6,.8);
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*noise(p);p=ROT*p*2.03+vec2(1.7,9.2);a*=.5;}return v;}
+const vec3 GREEN=vec3(.16,1.,.6), VIOLET=vec3(.62,.3,1.), TEAL=vec3(.3,.8,1.);
+vec3 ribbon(vec2 uv,float asp,float seed,float baseY,float wav,float rays,float height,float speed){
+  float x=uv.x*asp;
+  float y0=baseY+wav*(fbm(vec2(x*.5+t*speed,seed*4.1))-.5);
+  float d=uv.y-y0;
+  float a=smoothstep(-.012,.005,d)*exp(-max(d,0.)/height);
+  float r=fbm(vec2(x*22.+t*(.1+.15*energy),seed*7.3+t*.04)); r=pow(clamp(r*1.35,0.,1.),2.2);
+  return mix(GREEN,VIOLET,smoothstep(.05,.32,d)*.75)*a*mix(1.,.3+.95*r,rays);
+}
+vec3 aurora(vec2 uv,float asp){
+  vec3 col=vec3(0.);
+  if(w.x>.001){float cx=uv.x*asp-asp*.5;
+    float patchMask=mix(1.,exp(-pow((uv.x-.62)/.13,2.)),spot);
+    float base=mix(.66-.05*cx*cx,.49,spot);
+    col+=w.x*ribbon(uv,asp,1.,base,.05,.2,.05+.03*energy,.012)*1.1*patchMask;}
+  if(w.y>.001){for(int i=0;i<3;i++){float fi=float(i);
+    col+=w.y*ribbon(uv,asp*(1.1+fi*.35),fi+2.,.5+.12*fi,.24,1.,.17+.2*energy+.05*fi,.02+.02*energy)*(.62-fi*.16);}}
+  if(w.z>.001){vec2 d=vec2(uv.x*asp,uv.y)-vec2(.5*asp,1.18);
+    float ang=atan(d.x,-d.y),dist=length(d);
+    float r=fbm(vec2(ang*9.+t*.05,t*.25)); r=pow(clamp(r*1.4,0.,1.),2.6);
+    col+=w.z*mix(VIOLET,GREEN,smoothstep(.3,.75,dist))*r*smoothstep(.95,.55,dist)*smoothstep(.12,.42,dist)*1.5;
+    col+=w.z*ribbon(uv,asp,9.,.42,.18,1.,.2,.03)*.6;}
+  if(w.w>.001){float n=fbm(vec2(uv.x*asp*2.2,uv.y*3.2)+vec2(t*.03,0.));
+    col+=w.w*mix(GREEN,TEAL,.35)*smoothstep(.5,.72,n)*(.35+.65*(.5+.5*sin(t*1.4+n*14.)))*smoothstep(.3,.55,uv.y)*.85;}
+  return col;
+}
+vec3 scene(vec2 uv,float asp){
+  float h=clamp((uv.y-water)/(1.-water),0.,1.);
+  vec3 s=mix(mix(vec3(.88,.66,.52),vec3(.38,.5,.66),smoothstep(0.,1.,h)),mix(vec3(.025,.06,.09),vec3(.004,.012,.03),smoothstep(0.,1.,h)),dark);
+  vec3 a=aurora(uv,asp)*energy*(.2+.8*dark);
+  float sh=hash(floor(gl_FragCoord.xy/2.2));
+  // steady stars; about 1 in 100 now and then brightens briefly and fades back
+  float rare=step(hash(floor(gl_FragCoord.xy/2.2)+vec2(71.3,19.7)),.01);
+  float flare=rare*.7*pow(max(0.,sin(t*.23+sh*97.)),40.);
+  float star=step(.9965,sh)*(.8+flare)*dark*smoothstep(.35,.75,uv.y)*(1.-.6*energy);
+  vec3 col=s+a+vec3(star)*.8;
+  if(cloud>.01){
+    float drift=t*(.004+.0035*wind);
+    float n=fbm(vec2(uv.x*asp*1.0+drift,uv.y*2.2-t*.003))*.75+fbm(vec2(uv.x*asp*3.5+drift*2.5,uv.y*6.))*.25;
+    float thr=.92-.74*cloud;
+    float cov=smoothstep(thr-.1,thr+.1,n)*smoothstep(water,water+.06,uv.y);
+    cov=mix(cov,max(cov,.9),lit*cloud);
+    vec3 cn=mix(vec3(.05,.045,.05),vec3(.16,.12,.1),smoothstep(.75,.25,h));
+    cn=mix(cn,mix(vec3(.34,.29,.3),vec3(.56,.43,.37),smoothstep(.9,.1,h))*(.88+.24*n),lit);
+    vec3 cd=mix(vec3(.66,.68,.72),vec3(.92,.91,.9),smoothstep(thr,thr+.25,n));
+    vec3 cc=mix(cd,cn,dark)+flash*vec3(.55,.6,.75)*(.4+.6*n);
+    // the cameras saw the aurora, so the cloud can't be hiding it: thin it as the aurora strengthens
+    float see=1.-.5*energy*dark;
+    col=mix(col,cc,clamp(cov*.94*see,0.,.97));
+  }
+  return col+flash*.08;
+}
+void main(){
+  vec2 uv=gl_FragCoord.xy/res; float asp=res.x/res.y; vec3 c;
+  if(uv.y<water){
+    float depth=(water-uv.y)/water;
+    vec2 r=vec2(uv.x+.003*sin(uv.y*260.+t*1.3)*(.4+depth)*(1.+wind*.08),2.*water-uv.y+.004*sin(uv.x*90.+t*.8));
+    c=mix(scene(r,asp)*.42,mix(vec3(.30,.38,.46),vec3(.006,.014,.024),dark),.35+.4*depth);
+  } else c=scene(uv,asp);
+  float v=smoothstep(1.3,.35,length((uv-.5)*vec2(asp*.7,1.)));
+  gl_FragColor=vec4(c*mix(.72,1.,v),1.);
+}`;
+let uni = {};
+if (gl) {
+  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; };
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(prog); gl.useProgram(prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  for (const n of ["res", "t", "energy", "dark", "water", "cloud", "wind", "flash", "lit", "spot", "w"]) uni[n] = gl.getUniformLocation(prog, n);
+}
+
+// ---------- rain, snow, lightning, and drops on the lens ----------
+const wxc = document.getElementById("wx"), lens = document.getElementById("lens");
+const drops = Array.from({ length: 320 }, () => ({ x: Math.random(), y: Math.random(), z: .4 + Math.random() * .6, ph: Math.random() * 6.28 }));
+const beads = [];
+let wxAlpha = 0, fogAlpha = 0, flash = 0, nextBolt = 3, bolt = null, nextBead = 1;
+function drawWx(dt) {
+  const ctx = wxc.getContext("2d"), W = wxc.width, H = wxc.height, wx = SKY[live.sky], storm = live.sky === 5;
+  const precip = live.weather?.precip ?? (wx.kind ? 1 : 0);
+  wxAlpha += ((wx.kind ? 1 : 0) - wxAlpha) * Math.min(1, dt * 1.5);
+  ctx.clearRect(0, 0, W, H);
+  if (reduce) return;
+  const vx = Math.min(.35, (live.weather?.wind ?? wx.wind) / 70);
+  if (wxAlpha > .01) {
+    const snow = wx.kind === "snow", n = Math.round(drops.length * Math.min(1, Math.max(.35, precip / 1.5)));
+    for (let i = 0; i < n; i++) {
+      const d = drops[i];
+      if (snow) {
+        d.y += dt * .05 * d.z; d.x += dt * (.012 * Math.sin(d.ph += dt * 1.3) + vx * .08);
+        ctx.fillStyle = `rgba(235,242,250,${.55 * d.z * wxAlpha})`;
+        ctx.beginPath(); ctx.arc(d.x * W, d.y * H, (1 + d.z * 1.8) * H / 900, 0, 6.283); ctx.fill();
+      } else {
+        const vy = .9 + d.z * .7 + (storm ? .5 : 0), dx = vy * vx;
+        d.y += dt * vy; d.x += dt * dx;
+        const len = H * .03 * d.z * (storm ? 1.4 : 1), k = len / (vy * H);
+        ctx.strokeStyle = `rgba(190,210,230,${.28 * d.z * wxAlpha})`; ctx.lineWidth = Math.max(1, d.z * H / 900);
+        ctx.beginPath(); ctx.moveTo(d.x * W, d.y * H); ctx.lineTo(d.x * W - dx * W * k, d.y * H - len); ctx.stroke();
+      }
+      if (d.y > 1.02) { d.y = -.03; d.x = Math.random() * 1.2 - .2; }
+      if (d.x > 1.05) d.x = -.05;
+    }
+  }
+  if (storm) {
+    nextBolt -= dt;
+    if (nextBolt <= 0) {
+      flash = .9; nextBolt = 3 + Math.random() * 6;
+      bolt = Math.random() > .4 ? { x: .25 + Math.random() * .6, life: .35, segs: Array.from({ length: 9 }, () => Math.random() - .5) } : null;
+    }
+  }
+  flash = Math.max(0, flash - dt * 2.8);
+  if (bolt) {
+    bolt.life -= dt;
+    if (bolt.life <= 0) bolt = null;
+    else {
+      ctx.strokeStyle = `rgba(230,240,255,${Math.min(1, bolt.life * 3)})`; ctx.lineWidth = Math.max(1.5, H / 500);
+      ctx.beginPath(); let x = bolt.x * W, y = H * .12; ctx.moveTo(x, y);
+      for (const sgm of bolt.segs) { x += sgm * W * .04; y += (H * WL - H * .2) / bolt.segs.length; ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+  }
+  drawLens(dt, wx);
+}
+function drawLens(dt, wx) {
+  const ctx = lens.getContext("2d"), W = lens.width, H = lens.height;
+  ctx.clearRect(0, 0, W, H);
+  if (reduce) return;
+  nextBead -= dt;
+  if (wx.kind === "rain" && nextBead <= 0 && beads.length < 12) {
+    beads.push({ x: Math.random(), y: Math.random() * .7, r: (5 + Math.random() * 12) * H / 700, hold: 2 + Math.random() * 5, age: 0, v: 0 });
+    nextBead = (live.sky === 5 ? 1.2 : 3) + Math.random() * (live.sky === 5 ? 1.5 : 3);
+  }
+  for (let i = beads.length - 1; i >= 0; i--) {
+    const b = beads[i]; b.age += dt;
+    // sit for a moment, then slide down, speeding up gently, and fade out on the way
+    if (b.age > b.hold) { b.v = Math.min(.12, b.v + dt * .02); b.y += b.v * dt; }
+    const fade = .5 * Math.min(1, b.age * 4) * Math.max(0, 1 - Math.max(0, b.age - b.hold) / 6);
+    if (fade <= 0 || b.y > 1.05) { beads.splice(i, 1); continue; }
+    const x = b.x * W, y = b.y * H, r = b.r;
+    const g = ctx.createRadialGradient(x - r * .25, y - r * .3, r * .1, x, y, r);
+    g.addColorStop(0, `rgba(255,255,255,${.22 * fade})`); g.addColorStop(.55, `rgba(200,215,230,${.06 * fade})`); g.addColorStop(.9, `rgba(10,15,22,${.25 * fade})`); g.addColorStop(1, "rgba(10,15,22,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, r * .9, r, 0, 0, 6.283); ctx.fill();
+    ctx.fillStyle = `rgba(255,255,255,${.5 * fade})`; ctx.beginPath(); ctx.arc(x - r * .35, y - r * .4, r * .14, 0, 6.283); ctx.fill();
+  }
+  fogAlpha += ((wx.kind === "snow" ? 1 : 0) - fogAlpha) * Math.min(1, dt * .8);
+  if (fogAlpha > .01) {
+    const breathe = .85 + .15 * Math.sin(simT * .4);
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .35, W / 2, H / 2, Math.hypot(W, H) * .55);
+    g.addColorStop(0, "rgba(225,232,240,0)"); g.addColorStop(.6, `rgba(225,232,240,${.12 * fogAlpha * breathe})`); g.addColorStop(1, `rgba(235,240,246,${.42 * fogAlpha * breathe})`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+}
+
+// ---------- live state from check.ried.no ----------
+const fetched = { ok: false, ts: 0, dark: 1, detected: 0, count: 0, cameras: 7, intensity: 0, sky: 0, weather: null };
+let override = null; // set by the secret debug panel
+const live = { ...fetched };
+function applyState() { Object.assign(live, fetched, override || {}); render(); }
+const cur = { energy: 0, dark: 1, cloud: 0, wind: 3, lit: 0, spot: 0, w: [1, 0, 0, 0] };
+const target = { ...cur, w: [1, 0, 0, 0] };
+let pulseMix = 0, pulseClock = 0, landDark = null;
+function retarget() {
+  const wx = SKY[live.sky], lvl = LEVELS[live.intensity];
+  target.dark = live.dark; target.cloud = wx.cloud; target.lit = wx.lit;
+  target.wind = live.weather?.wind ?? wx.wind;
+  if (live.detected && lvl) { target.energy = lvl.energy; target.w = lvl.w; target.spot = lvl.spot; }
+  else { target.energy = 0; target.w = [1, 0, 0, 0]; target.spot = 0; }
+}
+function parseStatus(text) {
+  const kv = {};
+  for (const line of text.split("\n")) { const i = line.indexOf("="); if (i > 0) kv[line.slice(0, i).trim()] = line.slice(i + 1).trim(); }
+  return kv;
+}
+let polled = false;
+async function poll() {
+  try {
+    const res = await fetch(STATUS_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error(res.status);
+    const kv = parseStatus(await res.text());
+    if (!kv.ts) throw new Error("empty status");
+    Object.assign(fetched, { ok: true, ts: +kv.ts, dark: +kv.dark || 0, detected: +kv.detected || 0, count: +kv.count || 0, cameras: +kv.cameras || 7,
+      intensity: Math.min(4, +kv.intensity || (+kv.detected ? 2 : 0)), sky: Math.min(5, +kv.sky || 0) });
+  } catch { fetched.ok = false; }
+  try {
+    const res = await fetch(WEATHER_URL, { cache: "no-store" });
+    const ct = res.headers.get("content-type") || "";
+    fetched.weather = res.ok && ct.includes("json") ? await res.json() : null;
+  } catch { fetched.weather = null; }
+  polled = true;
+  applyState();
+}
+
+const $ = (id) => document.getElementById(id);
+function agoText() {
+  if (!polled && !override) return "checking…";
+  if (!live.ok) return "status unavailable, retrying";
+  const m = Math.max(0, Math.round((Date.now() / 1000 - live.ts) / 60));
+  return m === 0 ? "checked just now" : m === 1 ? "checked 1 min ago" : `checked ${m} min ago`;
+}
+function weatherText() {
+  const wx = SKY[live.sky], w = live.weather;
+  if (!w) return wx.label;
+  const parts = [`${wx.label}, ${Math.round(w.cloud)}% cloud`];
+  if (w.precip >= .1) parts.push(`${w.precip.toFixed(1)} mm/h`);
+  parts.push(`${w.temp > 0 ? "+" : ""}${Math.round(w.temp)}°C`, `wind ${Math.round(w.wind)} m/s`);
+  let text = parts.join(", ");
+  if (w.warnings?.length) text += ". MET warning: " + w.warnings.map(x => `${x.event} (${x.level})`).join(", ");
+  return text;
+}
+function render() {
+  const wx = SKY[live.sky], lvl = LEVELS[live.intensity];
+  const hidden = !live.detected && live.dark && wx.cloud > .8;
+  const a = $("answer");
+  const waiting = !live.ok && !live.ts;
+  a.textContent = waiting ? "" : live.detected ? "Yes." : hidden ? "Can't tell." : live.dark ? "Not yet." : "Too bright.";
+  a.classList.toggle("loading", waiting);
+  if (waiting) a.setAttribute("aria-label", "Checking"); else a.removeAttribute("aria-label");
+  $("dots").classList.toggle("gone", !waiting);
+  a.classList.toggle("yes", !!live.detected);
+  document.body.classList.toggle("day", live.ok && !live.dark);
+  $("tipLead").textContent = live.detected && lvl ? lvl.lead
+    : hidden ? "Clouds cover the sky. Aurora could be active above them, but the cameras can't see through."
+    : live.dark ? "Dark and quiet. Get alerts and you'll hear the moment that changes."
+    : "The sun is up. Watching starts at dusk.";
+  const pct = Math.round(100 * live.count / Math.max(1, live.cameras));
+  $("tipCams").textContent = pct ? `Visual hints of aurora in ${pct}% of the views` : "No visual hints of aurora";
+  $("tipInt").textContent = live.detected && lvl ? lvl.name : "None";
+  $("tipWx").textContent = weatherText();
+  $("checked").textContent = agoText();
+  retarget();
+  if (landDark !== live.dark) { landDark = live.dark; drawLand(land.getContext("2d"), land.width, land.height, live.dark === 1); }
+}
+
+// ---------- animation ----------
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const stage = $("stage"), land = $("land"), glow = $("glow");
+let last = performance.now(), simT = 30;
+function resize() {
+  const dpr = Math.min(devicePixelRatio || 1, 1.5), W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr);
+  for (const c of [sky, land, glow, wxc, lens]) { c.width = W; c.height = H; }
+  if (gl) gl.viewport(0, 0, W, H);
+  drawLand(land.getContext("2d"), W, H, live.dark === 1);
+  // place the invisible cathedral button over the drawn cathedral (CSS pixels)
+  const cw = innerWidth, chh = innerHeight, vw = landWidth(cw, chh), ox = landOffset(cw, vw), ch = L.cath.h * chh;
+  Object.assign($("cathedral").style, { left: `${L.cath.x * vw + ox - ch * .7}px`, top: `${chh * WL - ch * 1.1}px`, width: `${ch * 1.6}px`, height: `${ch * 1.15}px` });
+}
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (!document.hidden) {
+    if (!reduce) simT += dt;
+    const k = Math.min(1, dt * .9);
+    for (const key of ["energy", "dark", "cloud", "wind", "lit", "spot"]) cur[key] += (target[key] - cur[key]) * k;
+    pulseClock += dt;
+    pulseMix += ((live.detected && live.intensity >= 3 ? .4 * Math.max(0, Math.sin(pulseClock * .11)) : 0) - pulseMix) * k;
+    const w = target.w.map((v, i) => (cur.w[i] += (v - cur.w[i]) * k));
+    drawWx(dt);
+    drawLights(glow.getContext("2d"), glow.width, glow.height, cur.dark, reduce ? null : simT);
+    if (gl) {
+      gl.uniform2f(uni.res, sky.width, sky.height); gl.uniform1f(uni.t, simT);
+      gl.uniform1f(uni.energy, cur.energy); gl.uniform1f(uni.dark, cur.dark); gl.uniform1f(uni.water, WATER);
+      gl.uniform1f(uni.cloud, cur.cloud); gl.uniform1f(uni.wind, cur.wind); gl.uniform1f(uni.flash, flash);
+      gl.uniform1f(uni.lit, cur.lit); gl.uniform1f(uni.spot, cur.spot);
+      gl.uniform4f(uni.w, w[0], w[1], w[2], Math.max(w[3], pulseMix));
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+// ---------- background music, off until the visitor turns it on ----------
+const music = $("music"), sound = $("sound");
+music.volume = .18;
+fetch("background.mp3", { method: "HEAD" }).then(r => { if (r.ok) sound.hidden = false; }).catch(() => {});
+sound.addEventListener("click", async () => {
+  if (music.paused) { try { await music.play(); sound.setAttribute("aria-pressed", "true"); } catch {} }
+  else { music.pause(); sound.setAttribute("aria-pressed", "false"); }
+});
+
+// details card: shows while hovering or focusing the answer; a tap pins it open
+let tipPinned = false;
+const showTip = (on) => $("tip").classList.toggle("open", on || tipPinned);
+$("answer").addEventListener("mouseenter", () => showTip(true));
+$("answer").addEventListener("mouseleave", () => showTip(false));
+$("answer").addEventListener("focus", () => showTip(true));
+$("answer").addEventListener("blur", () => showTip(false));
+$("answer").addEventListener("click", () => { tipPinned = !tipPinned; showTip(tipPinned); });
+// secret: 10 taps on the Arctic Cathedral within 4 seconds opens the debug panel
+let taps = [];
+$("cathedral").addEventListener("click", () => {
+  const now = performance.now(); taps = taps.filter(t => now - t < 4000); taps.push(now);
+  if (taps.length >= 10) { taps = []; $("debug").hidden = false; syncDebug(); }
+});
+const dbg = { state: "live", intensity: 2, sky: 0 };
+function syncDebug() {
+  for (const [id, val] of [["dbgState", dbg.state], ["dbgInt", String(dbg.intensity)], ["dbgSky", String(dbg.sky)]])
+    $(id).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === val));
+  $("dbgInt").querySelectorAll("button").forEach(b => b.disabled = dbg.state !== "aurora");
+  $("dbgSky").querySelectorAll("button").forEach(b => b.disabled = dbg.state === "live");
+}
+function applyDebug() {
+  if (dbg.state === "live") override = null;
+  else {
+    const aurora = dbg.state === "aurora";
+    override = { ok: true, ts: Math.floor(Date.now() / 1000), dark: dbg.state === "day" ? 0 : 1, detected: aurora ? 1 : 0,
+      intensity: aurora ? dbg.intensity : 0, count: aurora ? [0, 1, 2, 3, 5][dbg.intensity] : 0, sky: dbg.sky, weather: null };
+  }
+  syncDebug(); applyState();
+}
+for (const [id, key] of [["dbgState", "state"], ["dbgInt", "intensity"], ["dbgSky", "sky"]])
+  $(id).addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b || b.disabled) return; dbg[key] = key === "state" ? b.dataset.v : +b.dataset.v; applyDebug(); });
+$("debugClose").addEventListener("click", () => { $("debug").hidden = true; dbg.state = "live"; applyDebug(); });
+// side rail: on touch screens the first tap only brightens it, so links are never hit blind
+$("rail").addEventListener("click", (e) => {
+  const r = $("rail");
+  if (matchMedia("(hover: none)").matches && !r.classList.contains("lit")) {
+    e.preventDefault(); r.classList.add("lit"); clearTimeout(r.dim); r.dim = setTimeout(() => r.classList.remove("lit"), 4000);
+  }
+});
+// build date: GitHub Pages sets Last-Modified when the page is deployed (same as eucviewer.ried.no)
+(() => {
+  const d = new Date(document.lastModified);
+  $("page-version").textContent = "build " + (isNaN(d.getTime()) ? document.lastModified : d.toISOString().slice(0, 16).replace("T", " "));
+})();
+addEventListener("resize", resize);
+resize(); render(); poll();
+setInterval(poll, POLL_MS);
+setInterval(() => { $("checked").textContent = agoText(); }, 15000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -1,0 +1,185 @@
+{
+  "cameras": [
+    {
+      "id": "tromsobrua",
+      "name": "Tromsøbrua",
+      "url": "https://www.yr.no/webcams/3/600/3000989_1",
+      "detection_regions": [],
+      "noise_baseline": {
+        "green": 0.0,
+        "red": 0.0,
+        "violet": 0.0
+      }
+    },
+    {
+      "id": "tromsdalen",
+      "name": "Tromsdalen",
+      "url": "https://www.yr.no/webcams/8/600/1309685432.jpg",
+      "detection_regions": [
+        [
+          8,
+          13,
+          597,
+          163
+        ]
+      ],
+      "noise_baseline": {
+        "green": 24.361,
+        "red": 26.816,
+        "violet": 2.596
+      }
+    },
+    {
+      "id": "tromso_north",
+      "name": "Tromsø North",
+      "url": "https://www.yr.no/webcams/1/600/tromso/1.jpg",
+      "detection_regions": [
+        [
+          12,
+          6,
+          595,
+          157
+        ]
+      ],
+      "noise_baseline": {
+        "green": 0.0,
+        "red": 0.0,
+        "violet": 0.0
+      }
+    },
+    {
+      "id": "tromso",
+      "name": "Tromsø",
+      "url": "https://www.yr.no/webcams/8/600/1345854014.jpg",
+      "detection_regions": [
+        [
+          9,
+          5,
+          493,
+          146
+        ],
+        [
+          497,
+          4,
+          563,
+          112
+        ]
+      ],
+      "noise_baseline": {
+        "green": 0.107,
+        "red": 0.403,
+        "violet": 0.0
+      }
+    },
+    {
+      "id": "uit_north",
+      "name": "UiT North",
+      "url": "https://weather.cs.uit.no/cam/cam_north.jpg",
+      "detection_regions": [
+        [
+          23,
+          3,
+          2868,
+          1217
+        ],
+        [
+          2856,
+          207,
+          2979,
+          1221
+        ]
+      ],
+      "noise_baseline": {
+        "green": 0.0,
+        "red": 0.0,
+        "violet": 0.221
+      },
+      "detection_threshold": 1.464
+    },
+    {
+      "id": "uit_south",
+      "name": "UiT South",
+      "url": "https://weather.cs.uit.no/cam/cam_south.jpg",
+      "detection_regions": [
+        [
+          34,
+          0,
+          2860,
+          1259
+        ],
+        [
+          2853,
+          145,
+          3056,
+          1328
+        ]
+      ],
+      "noise_baseline": {
+        "green": 0.007,
+        "red": 0.287,
+        "violet": 0.718
+      }
+    },
+    {
+      "id": "uit_east",
+      "name": "UiT East",
+      "url": "https://weather.cs.uit.no/cam/cam_east.jpg",
+      "detection_regions": [
+        [
+          702,
+          257,
+          3041,
+          1144
+        ],
+        [
+          15,
+          3,
+          2860,
+          241
+        ],
+        [
+          30,
+          249,
+          284,
+          1240
+        ],
+        [
+          288,
+          249,
+          675,
+          691
+        ]
+      ],
+      "noise_baseline": {
+        "green": 0.004,
+        "red": 0.0,
+        "violet": 0.512
+      },
+      "detection_threshold": 0.647
+    },
+    {
+      "id": "uit_west",
+      "name": "UiT West",
+      "url": "https://weather.cs.uit.no/cam/cam_west.jpg",
+      "detection_regions": [
+        [
+          38,
+          3,
+          2856,
+          1324
+        ],
+        [
+          2853,
+          215,
+          3060,
+          1251
+        ]
+      ],
+      "noise_baseline": {
+        "green": 0.001,
+        "red": 0.024,
+        "violet": 0.805
+      }
+    }
+  ]
+}
