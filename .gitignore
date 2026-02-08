@@ -21,8 +21,6 @@ data/alert_state.json
 # OS
 .DS_Store
 Thumbs.db
-/data/archive
-/data/calibration_images
 
 # Claude Code
 .claude/
