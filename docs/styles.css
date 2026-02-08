@@ -97,9 +97,9 @@ body {
 }
 
 .card {
-  width: min(760px, 100%);
+  width: min(640px, 100%);
   margin: 0;
-  padding: 18px;
+  padding: 16px;
   border: 1px solid var(--card-border);
   border-radius: 18px;
   background: var(--card);
@@ -170,9 +170,9 @@ body {
 }
 
 .actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
   grid-column: 1 / -1;
 }
 
@@ -188,6 +188,7 @@ body {
   letter-spacing: 0.01em;
   border: 1px solid transparent;
   transition: transform 140ms ease, background-color 140ms ease, border-color 140ms ease, opacity 140ms ease;
+  width: 100%;
 }
 
 .btn:focus-visible {
@@ -216,6 +217,7 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   align-content: start;
+  justify-items: center;
 }
 
 .peek {
@@ -242,7 +244,7 @@ body {
 }
 
 .thumbFrame {
-  width: 100%;
+  width: 124px;
   aspect-ratio: 9 / 20;
   border-radius: 14px;
   overflow: hidden;
@@ -414,7 +416,32 @@ body {
   }
 }
 
+@media (orientation: portrait) {
+  .card {
+    grid-template-columns: 1fr;
+  }
+
+  .card__right {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .thumbFrame {
+    width: 96px;
+  }
+}
+
+@media (max-width: 420px) {
+  .card__right {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 520px) {
+  .actions {
+    grid-template-columns: 1fr;
+  }
+
   .viewer__ui {
     grid-template-columns: 44px 1fr 44px;
     padding: 14px;
