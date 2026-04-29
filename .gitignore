@@ -26,3 +26,6 @@ Thumbs.db
 .claude/
 *.tar
 data/archive/*.sh
+data/archive/*.py
+data/archive/uploaded/
+data/archive/tmp_day/
