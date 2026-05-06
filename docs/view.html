@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Splat viewer</title>
 <style>
   :root { color-scheme: dark; }
@@ -38,6 +39,21 @@
                background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden; }
   #statusBarFill { display:block; height:100%; width:0%;
                    background:#3a78ff; transition:width 0.12s linear; }
+  @media (max-width: 768px), (pointer: coarse) {
+    body { font-size:18px; }
+    #toggle {
+      bottom:40px; gap:20px; padding:16px 28px; border-radius:44px;
+    }
+    #toggle .lbl { min-width:52px; font-size:18px; }
+    #toggle .track { width:68px; height:32px; border-radius:20px; }
+    #toggle .knob { top:3px; left:3px; width:26px; height:26px; }
+    #toggle.on .knob { left:39px; }
+    #status {
+      top:20px; left:20px; right:20px; padding:14px 18px 16px;
+      font-size:16px; min-width:0;
+    }
+    #statusBar { height:6px; margin-top:10px; }
+  }
 </style>
 </head>
 <body>
@@ -112,6 +128,8 @@ const CONFIG = {
 const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
 
+const RENDER_SCALE = matchMedia('(pointer: coarse)').matches ? 0.65 : 1;
+
 function makeViewer(rootEl, withControls) {
   const canvas = document.createElement('canvas');
   rootEl.appendChild(canvas);
@@ -121,7 +139,8 @@ function makeViewer(rootEl, withControls) {
   const camera = new SPLAT.Camera();
   const controls = withControls ? new SPLAT.OrbitControls(camera, canvas) : null;
   function resize() {
-    const w = rootEl.clientWidth, h = rootEl.clientHeight;
+    const w = Math.floor(rootEl.clientWidth  * RENDER_SCALE);
+    const h = Math.floor(rootEl.clientHeight * RENDER_SCALE);
     if (w === 0 || h === 0) return;
     renderer.setSize(w, h);
   }
@@ -212,11 +231,14 @@ function syncSlaveCamera() {
   sd._updateProjectionMatrix();
 }
 
+let on = false;
+let transitionEndTime = performance.now() + 1100;
 (function loop() {
   M.controls.update();
   syncSlaveCamera();
-  M.renderer.render(M.scene, M.camera);
-  S.renderer.render(S.scene, S.camera);
+  const transitioning = performance.now() < transitionEndTime;
+  if (!on || transitioning) M.renderer.render(M.scene, M.camera);
+  if (on  || transitioning) S.renderer.render(S.scene, S.camera);
   requestAnimationFrame(loop);
 })();
 
@@ -225,9 +247,9 @@ const slaveEl  = $('slave');
 const toggle = $('toggle');
 const lblOff = $('lblOff');
 const lblOn  = $('lblOn');
-let on = false;
 function setState(next) {
   on = next;
+  transitionEndTime = performance.now() + 1100;
   toggle.classList.toggle('on', on);
   masterEl.style.opacity = on ? '0' : '1';
   slaveEl.style.opacity  = on ? '1' : '0';
