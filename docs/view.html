@@ -8,7 +8,11 @@
   :root { color-scheme: dark; }
   html, body { margin:0; padding:0; height:100%; background:#000; overflow:hidden; font:13px system-ui,Segoe UI,sans-serif; color:#eee; }
   #stage { position:fixed; inset:0; }
-  #stage canvas { position:absolute; inset:0; width:100% !important; height:100% !important; display:block; }
+  #stage > canvas { position:absolute; inset:0; width:100% !important; height:100% !important; display:block; }
+  #master, #slave { position:absolute; inset:0; transition:opacity 1s ease-in-out; }
+  #master canvas, #slave canvas { position:absolute; inset:0; width:100% !important; height:100% !important; display:block; }
+  #master { opacity:1; }
+  #slave  { opacity:0; pointer-events:none; }
   #toggle {
     position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
     display:flex; align-items:center; gap:14px;
@@ -122,28 +126,31 @@ const CONFIG = {
 const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
 
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const RENDER_SCALE = isIOS ? 0.5 : (matchMedia('(pointer: coarse)').matches ? 0.65 : 1);
+const isAppleWebKit = /^Apple/.test(navigator.vendor || '');
+const isCoarse = matchMedia('(pointer: coarse)').matches;
+const RENDER_SCALE = isAppleWebKit && isCoarse ? 0.5 : (isCoarse ? 0.65 : 1);
 
 const stage = $('stage');
-const canvas = document.createElement('canvas');
-stage.appendChild(canvas);
-const renderer = new SPLAT.WebGLRenderer(canvas);
-renderer.backgroundColor = new SPLAT.Color32(0, 0, 0, 0);
-const camera = new SPLAT.Camera();
-const controls = new SPLAT.OrbitControls(camera, canvas);
 const sceneA = new SPLAT.Scene();
 const sceneB = new SPLAT.Scene();
 
-function resize() {
-  const w = Math.floor(stage.clientWidth  * RENDER_SCALE);
-  const h = Math.floor(stage.clientHeight * RENDER_SCALE);
-  if (w === 0 || h === 0) return;
-  renderer.setSize(w, h);
+function makeViewer(rootEl, withControls) {
+  const cv = document.createElement('canvas');
+  rootEl.appendChild(cv);
+  const r = new SPLAT.WebGLRenderer(cv);
+  r.backgroundColor = new SPLAT.Color32(0, 0, 0, 0);
+  const cam = new SPLAT.Camera();
+  const ctl = withControls ? new SPLAT.OrbitControls(cam, cv) : null;
+  function resize() {
+    const w = Math.floor(rootEl.clientWidth  * RENDER_SCALE);
+    const h = Math.floor(rootEl.clientHeight * RENDER_SCALE);
+    if (w === 0 || h === 0) return;
+    r.setSize(w, h);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  return { canvas: cv, renderer: r, camera: cam, controls: ctl };
 }
-resize();
-window.addEventListener('resize', resize);
 
 function loadSplat(url, scene, onProgress) {
   if (url.endsWith('.splat')) return SPLAT.Loader.LoadAsync(url, scene, onProgress);
@@ -208,29 +215,24 @@ splatB.rotation = quatFromEulerXYZ(t.rx*Math.PI/180, t.ry*Math.PI/180, t.rz*Math
 splatB.scale    = new SPLAT.Vector3(t.scale, t.scale, t.scale);
 
 const c = CONFIG.camera;
-camera.position = new SPLAT.Vector3(c.position[0], c.position[1], c.position[2]);
-controls.setCameraTarget(new SPLAT.Vector3(c.target[0], c.target[1], c.target[2]));
+const camPos    = new SPLAT.Vector3(c.position[0], c.position[1], c.position[2]);
+const camTarget = new SPLAT.Vector3(c.target[0],   c.target[1],   c.target[2]);
 
 statusEl.classList.add('gone');
 setTimeout(() => statusEl.remove(), 800);
 
 let on = false;
-let activeScene = sceneA;
-(function loop() {
-  controls.update();
-  renderer.render(activeScene, camera);
-  requestAnimationFrame(loop);
-})();
-
 const toggle = $('toggle');
 const lblOff = $('lblOff');
 const lblOn  = $('lblOn');
+
+let onSwap = () => {};
 function setState(next) {
   on = next;
-  activeScene = on ? sceneB : sceneA;
   toggle.classList.toggle('on', on);
   lblOff.classList.toggle('dim',  on);
   lblOn.classList.toggle('dim', !on);
+  onSwap(on);
 }
 toggle.addEventListener('click', () => setState(!on));
 toggle.addEventListener('keydown', (e) => {
@@ -241,6 +243,53 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault(); setState(!on);
   }
 });
+
+if (isAppleWebKit) {
+  // Single renderer, instant swap (memory-safe for iOS WebKit).
+  const V = makeViewer(stage, true);
+  V.camera.position = camPos;
+  V.controls.setCameraTarget(camTarget);
+  let activeScene = sceneA;
+  onSwap = (state) => { activeScene = state ? sceneB : sceneA; };
+  (function loop() {
+    V.controls.update();
+    V.renderer.render(activeScene, V.camera);
+    requestAnimationFrame(loop);
+  })();
+} else {
+  // Dual renderer with crossfade.
+  const masterEl = document.createElement('div'); masterEl.id = 'master';
+  const slaveEl  = document.createElement('div'); slaveEl.id  = 'slave';
+  stage.appendChild(masterEl);
+  stage.appendChild(slaveEl);
+  const M = makeViewer(masterEl, true);
+  const S = makeViewer(slaveEl, false);
+  M.camera.position = camPos;
+  M.controls.setCameraTarget(camTarget);
+  function syncSlaveCamera() {
+    S.camera.position = M.camera.position.clone();
+    S.camera.rotation = M.camera.rotation.clone();
+    const md = M.camera.data, sd = S.camera.data;
+    sd._fx = md._fx; sd._fy = md._fy;
+    sd._near = md._near; sd._far = md._far;
+    sd._width = md._width; sd._height = md._height;
+    sd._updateProjectionMatrix();
+  }
+  let transitionEndTime = performance.now() + 1100;
+  onSwap = (state) => {
+    transitionEndTime = performance.now() + 1100;
+    masterEl.style.opacity = state ? '0' : '1';
+    slaveEl.style.opacity  = state ? '1' : '0';
+  };
+  (function loop() {
+    M.controls.update();
+    syncSlaveCamera();
+    const transitioning = performance.now() < transitionEndTime;
+    if (!on || transitioning) M.renderer.render(sceneA, M.camera);
+    if (on  || transitioning) S.renderer.render(sceneB, S.camera);
+    requestAnimationFrame(loop);
+  })();
+}
 </script>
 </body>
 </html>
