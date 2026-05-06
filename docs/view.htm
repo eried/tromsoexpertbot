@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Splat viewer</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin:0; padding:0; height:100%; background:#000; overflow:hidden; font:13px system-ui,Segoe UI,sans-serif; color:#eee; }
+  #stage { position:fixed; inset:0; }
+  #master, #slave { position:absolute; inset:0; transition:opacity 1s ease-in-out; }
+  #master canvas, #slave canvas { position:absolute; inset:0; width:100% !important; height:100% !important; display:block; }
+  #master { opacity:1; }
+  #slave  { opacity:0; pointer-events:none; }
+  #toggle {
+    position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:14px;
+    padding:10px 18px; background:rgba(20,20,24,0.55);
+    color:#fff; border:1px solid rgba(255,255,255,0.18); border-radius:30px;
+    backdrop-filter:blur(10px); user-select:none; cursor:pointer;
+    transition:background 0.2s; z-index:5;
+  }
+  #toggle:hover { background:rgba(35,35,42,0.7); }
+  #toggle .lbl { min-width:34px; text-align:center; font-weight:600; letter-spacing:0.06em; }
+  #toggle .lbl.dim { opacity:0.4; }
+  #toggle .track { width:46px; height:22px; background:#2a2a32; border-radius:14px; position:relative; transition:background 0.3s; }
+  #toggle.on .track { background:#3a78ff; }
+  #toggle .knob { position:absolute; top:2px; left:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:left 0.3s ease-in-out; }
+  #toggle.on .knob { left:26px; }
+  #status {
+    position:fixed; top:14px; left:14px; padding:8px 12px 10px;
+    background:rgba(20,20,24,0.78); border:1px solid rgba(255,255,255,0.1);
+    border-radius:6px; font:12px ui-monospace,Consolas,monospace; color:#cfcfd5;
+    pointer-events:none; min-width:280px;
+  }
+  #status.gone { opacity:0; transition:opacity 0.6s; }
+  #statusText { display:block; }
+  #statusBar { display:block; margin-top:6px; height:4px; width:100%;
+               background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden; }
+  #statusBarFill { display:block; height:100%; width:0%;
+                   background:#3a78ff; transition:width 0.12s linear; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="master"></div>
+  <div id="slave"></div>
+</div>
+
+<div id="status"><span id="statusText">loading&hellip;</span><span id="statusBar"><span id="statusBarFill"></span></span></div>
+
+<div id="toggle" role="button" tabindex="0" aria-label="Toggle on/off">
+  <span class="lbl" id="lblOff">OFF</span>
+  <span class="track"><span class="knob"></span></span>
+  <span class="lbl dim" id="lblOn">ON</span>
+</div>
+
+<script type="module">
+import * as SPLAT from "https://cdn.jsdelivr.net/npm/gsplat@1.2.9/dist/index.es.js";
+
+const CONFIG = {
+  "splatA": "off_new.splat",
+  "splatB": "on_new.splat",
+  "camera": {
+    "position": [
+      -5.863445316819754,
+      0.91041402335087,
+      -1.868527643964453
+    ],
+    "rotation": [
+      -0.23338897788299243,
+      0.5648790598244252,
+      0.17057816889410715,
+      0.7728805347990976
+    ],
+    "target": [
+      0,
+      5,
+      0
+    ],
+    "fx": 1132,
+    "fy": 1132,
+    "near": 0.1,
+    "far": 100
+  },
+  "transform": {
+    "tx_fine": -0.548,
+    "ty_fine": -1.251,
+    "tz_fine": -1.182,
+    "tx_coarse": 0.87,
+    "ty_coarse": 0.12,
+    "tz_coarse": 1.92,
+    "rx_fine": -2.75,
+    "ry_fine": 4.1,
+    "rz_fine": -5.35,
+    "rx_coarse": 0,
+    "ry_coarse": -42.1,
+    "rz_coarse": -2.8,
+    "tx": 0.32199999999999995,
+    "ty": -1.1309999999999998,
+    "tz": 0.738,
+    "rx": -2.75,
+    "ry": -38,
+    "rz": -8.149999999999999,
+    "scale": 1.235
+  },
+  "alpha": {
+    "A": 1,
+    "B": 0.5
+  }
+};
+
+const $ = (id) => document.getElementById(id);
+const statusEl = $('status');
+
+function makeViewer(rootEl, withControls) {
+  const canvas = document.createElement('canvas');
+  rootEl.appendChild(canvas);
+  const renderer = new SPLAT.WebGLRenderer(canvas);
+  renderer.backgroundColor = new SPLAT.Color32(0, 0, 0, 0);
+  const scene = new SPLAT.Scene();
+  const camera = new SPLAT.Camera();
+  const controls = withControls ? new SPLAT.OrbitControls(camera, canvas) : null;
+  function resize() {
+    const w = rootEl.clientWidth, h = rootEl.clientHeight;
+    if (w === 0 || h === 0) return;
+    renderer.setSize(w, h);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  return { canvas, renderer, scene, camera, controls };
+}
+
+const M = makeViewer($('master'), true);
+const S = makeViewer($('slave'), false);
+
+function loadSplat(url, scene, onProgress) {
+  if (url.endsWith('.splat')) return SPLAT.Loader.LoadAsync(url, scene, onProgress);
+  if (url.endsWith('.ply'))   return SPLAT.PLYLoader.LoadAsync(url, scene, onProgress);
+  throw new Error('unknown splat extension: ' + url);
+}
+
+async function getSplatCount(url) {
+  try {
+    const r = await fetch(url, { method: 'HEAD' });
+    const sz = parseInt(r.headers.get('content-length') || '0', 10);
+    if (!sz) return null;
+    if (url.endsWith('.splat')) return Math.floor(sz / 32);
+    if (url.endsWith('.ply')) return Math.floor((sz - 3000) / 236); // Postshot SH-3 estimate
+  } catch (_) {}
+  return null;
+}
+
+const statusText = $('statusText');
+const statusFill = $('statusBarFill');
+function fmtK(n) { return Math.round(n / 1000).toLocaleString(); }
+function setProgress(loaded, total, frac) {
+  if (total) {
+    statusText.textContent = 'loading gaussian splat — ' + fmtK(loaded) + ' / ' + fmtK(total) + ' ksplats';
+  } else {
+    statusText.textContent = 'loading gaussian splat — ' + (frac*100).toFixed(0) + '%';
+  }
+  statusFill.style.width = (frac * 100).toFixed(1) + '%';
+}
+
+const totalA = await getSplatCount(CONFIG.splatA);
+const totalB = await getSplatCount(CONFIG.splatB);
+const totalAll = (totalA || 0) + (totalB || 0);
+
+setProgress(0, totalAll, 0);
+await loadSplat(CONFIG.splatA, M.scene, (p) => {
+  const loaded = Math.floor(p * (totalA || 0));
+  setProgress(loaded, totalAll, p * 0.5);
+});
+setProgress(totalA || 0, totalAll, 0.5);
+await loadSplat(CONFIG.splatB, S.scene, (p) => {
+  const loaded = (totalA || 0) + Math.floor(p * (totalB || 0));
+  setProgress(loaded, totalAll, 0.5 + p * 0.5);
+});
+setProgress(totalAll, totalAll, 1);
+const splatB = S.scene._objects[0];
+
+function quatFromEulerXYZ(rx, ry, rz) {
+  const c1 = Math.cos(rx*0.5), s1 = Math.sin(rx*0.5);
+  const c2 = Math.cos(ry*0.5), s2 = Math.sin(ry*0.5);
+  const c3 = Math.cos(rz*0.5), s3 = Math.sin(rz*0.5);
+  return new SPLAT.Quaternion(
+    s1 * c2 * c3 + c1 * s2 * s3,
+    c1 * s2 * c3 - s1 * c2 * s3,
+    c1 * c2 * s3 + s1 * s2 * c3,
+    c1 * c2 * c3 - s1 * s2 * s3
+  );
+}
+const t = CONFIG.transform;
+splatB.position = new SPLAT.Vector3(t.tx, t.ty, t.tz);
+splatB.rotation = quatFromEulerXYZ(t.rx*Math.PI/180, t.ry*Math.PI/180, t.rz*Math.PI/180);
+splatB.scale    = new SPLAT.Vector3(t.scale, t.scale, t.scale);
+
+const c = CONFIG.camera;
+M.camera.position = new SPLAT.Vector3(c.position[0], c.position[1], c.position[2]);
+M.controls.setCameraTarget(new SPLAT.Vector3(c.target[0], c.target[1], c.target[2]));
+
+statusEl.classList.add('gone');
+setTimeout(() => statusEl.remove(), 800);
+
+function syncSlaveCamera() {
+  S.camera.position = M.camera.position.clone();
+  S.camera.rotation = M.camera.rotation.clone();
+  const md = M.camera.data, sd = S.camera.data;
+  sd._fx = md._fx; sd._fy = md._fy;
+  sd._near = md._near; sd._far = md._far;
+  sd._width = md._width; sd._height = md._height;
+  sd._updateProjectionMatrix();
+}
+
+(function loop() {
+  M.controls.update();
+  syncSlaveCamera();
+  M.renderer.render(M.scene, M.camera);
+  S.renderer.render(S.scene, S.camera);
+  requestAnimationFrame(loop);
+})();
+
+const masterEl = $('master');
+const slaveEl  = $('slave');
+const toggle = $('toggle');
+const lblOff = $('lblOff');
+const lblOn  = $('lblOn');
+let on = false;
+function setState(next) {
+  on = next;
+  toggle.classList.toggle('on', on);
+  masterEl.style.opacity = on ? '0' : '1';
+  slaveEl.style.opacity  = on ? '1' : '0';
+  lblOff.classList.toggle('dim',  on);
+  lblOn.classList.toggle('dim', !on);
+}
+toggle.addEventListener('click', () => setState(!on));
+toggle.addEventListener('keydown', (e) => {
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setState(!on); }
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key === ' ' && document.activeElement !== toggle) {
+    e.preventDefault(); setState(!on);
+  }
+});
+</script>
+</body>
+</html>
