@@ -8,10 +8,7 @@
   :root { color-scheme: dark; }
   html, body { margin:0; padding:0; height:100%; background:#000; overflow:hidden; font:13px system-ui,Segoe UI,sans-serif; color:#eee; }
   #stage { position:fixed; inset:0; }
-  #master, #slave { position:absolute; inset:0; transition:opacity 1s ease-in-out; }
-  #master canvas, #slave canvas { position:absolute; inset:0; width:100% !important; height:100% !important; display:block; }
-  #master { opacity:1; }
-  #slave  { opacity:0; pointer-events:none; }
+  #stage canvas { position:absolute; inset:0; width:100% !important; height:100% !important; display:block; }
   #toggle {
     position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
     display:flex; align-items:center; gap:14px;
@@ -57,10 +54,7 @@
 </style>
 </head>
 <body>
-<div id="stage">
-  <div id="master"></div>
-  <div id="slave"></div>
-</div>
+<div id="stage"></div>
 
 <div id="status"><span id="statusText">loading&hellip;</span><span id="statusBar"><span id="statusBarFill"></span></span></div>
 
@@ -128,29 +122,28 @@ const CONFIG = {
 const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
 
-const RENDER_SCALE = matchMedia('(pointer: coarse)').matches ? 0.65 : 1;
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const RENDER_SCALE = isIOS ? 0.5 : (matchMedia('(pointer: coarse)').matches ? 0.65 : 1);
 
-function makeViewer(rootEl, withControls) {
-  const canvas = document.createElement('canvas');
-  rootEl.appendChild(canvas);
-  const renderer = new SPLAT.WebGLRenderer(canvas);
-  renderer.backgroundColor = new SPLAT.Color32(0, 0, 0, 0);
-  const scene = new SPLAT.Scene();
-  const camera = new SPLAT.Camera();
-  const controls = withControls ? new SPLAT.OrbitControls(camera, canvas) : null;
-  function resize() {
-    const w = Math.floor(rootEl.clientWidth  * RENDER_SCALE);
-    const h = Math.floor(rootEl.clientHeight * RENDER_SCALE);
-    if (w === 0 || h === 0) return;
-    renderer.setSize(w, h);
-  }
-  resize();
-  window.addEventListener('resize', resize);
-  return { canvas, renderer, scene, camera, controls };
+const stage = $('stage');
+const canvas = document.createElement('canvas');
+stage.appendChild(canvas);
+const renderer = new SPLAT.WebGLRenderer(canvas);
+renderer.backgroundColor = new SPLAT.Color32(0, 0, 0, 0);
+const camera = new SPLAT.Camera();
+const controls = new SPLAT.OrbitControls(camera, canvas);
+const sceneA = new SPLAT.Scene();
+const sceneB = new SPLAT.Scene();
+
+function resize() {
+  const w = Math.floor(stage.clientWidth  * RENDER_SCALE);
+  const h = Math.floor(stage.clientHeight * RENDER_SCALE);
+  if (w === 0 || h === 0) return;
+  renderer.setSize(w, h);
 }
-
-const M = makeViewer($('master'), true);
-const S = makeViewer($('slave'), false);
+resize();
+window.addEventListener('resize', resize);
 
 function loadSplat(url, scene, onProgress) {
   if (url.endsWith('.splat')) return SPLAT.Loader.LoadAsync(url, scene, onProgress);
@@ -186,17 +179,17 @@ const totalB = await getSplatCount(CONFIG.splatB);
 const totalAll = (totalA || 0) + (totalB || 0);
 
 setProgress(0, totalAll, 0);
-await loadSplat(CONFIG.splatA, M.scene, (p) => {
+await loadSplat(CONFIG.splatA, sceneA, (p) => {
   const loaded = Math.floor(p * (totalA || 0));
   setProgress(loaded, totalAll, p * 0.5);
 });
 setProgress(totalA || 0, totalAll, 0.5);
-await loadSplat(CONFIG.splatB, S.scene, (p) => {
+await loadSplat(CONFIG.splatB, sceneB, (p) => {
   const loaded = (totalA || 0) + Math.floor(p * (totalB || 0));
   setProgress(loaded, totalAll, 0.5 + p * 0.5);
 });
 setProgress(totalAll, totalAll, 1);
-const splatB = S.scene._objects[0];
+const splatB = sceneB._objects[0];
 
 function quatFromEulerXYZ(rx, ry, rz) {
   const c1 = Math.cos(rx*0.5), s1 = Math.sin(rx*0.5);
@@ -215,44 +208,27 @@ splatB.rotation = quatFromEulerXYZ(t.rx*Math.PI/180, t.ry*Math.PI/180, t.rz*Math
 splatB.scale    = new SPLAT.Vector3(t.scale, t.scale, t.scale);
 
 const c = CONFIG.camera;
-M.camera.position = new SPLAT.Vector3(c.position[0], c.position[1], c.position[2]);
-M.controls.setCameraTarget(new SPLAT.Vector3(c.target[0], c.target[1], c.target[2]));
+camera.position = new SPLAT.Vector3(c.position[0], c.position[1], c.position[2]);
+controls.setCameraTarget(new SPLAT.Vector3(c.target[0], c.target[1], c.target[2]));
 
 statusEl.classList.add('gone');
 setTimeout(() => statusEl.remove(), 800);
 
-function syncSlaveCamera() {
-  S.camera.position = M.camera.position.clone();
-  S.camera.rotation = M.camera.rotation.clone();
-  const md = M.camera.data, sd = S.camera.data;
-  sd._fx = md._fx; sd._fy = md._fy;
-  sd._near = md._near; sd._far = md._far;
-  sd._width = md._width; sd._height = md._height;
-  sd._updateProjectionMatrix();
-}
-
 let on = false;
-let transitionEndTime = performance.now() + 1100;
+let activeScene = sceneA;
 (function loop() {
-  M.controls.update();
-  syncSlaveCamera();
-  const transitioning = performance.now() < transitionEndTime;
-  if (!on || transitioning) M.renderer.render(M.scene, M.camera);
-  if (on  || transitioning) S.renderer.render(S.scene, S.camera);
+  controls.update();
+  renderer.render(activeScene, camera);
   requestAnimationFrame(loop);
 })();
 
-const masterEl = $('master');
-const slaveEl  = $('slave');
 const toggle = $('toggle');
 const lblOff = $('lblOff');
 const lblOn  = $('lblOn');
 function setState(next) {
   on = next;
-  transitionEndTime = performance.now() + 1100;
+  activeScene = on ? sceneB : sceneA;
   toggle.classList.toggle('on', on);
-  masterEl.style.opacity = on ? '0' : '1';
-  slaveEl.style.opacity  = on ? '1' : '0';
   lblOff.classList.toggle('dim',  on);
   lblOn.classList.toggle('dim', !on);
 }
